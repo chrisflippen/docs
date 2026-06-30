@@ -1,0 +1,18 @@
+---
+title: "Feed Ingestion Pipeline"
+description: "How third-party inventory files flow from intake through attribution into the vehicle store and back out as compliant Google vehicle-ad feeds."
+icon: "workflow"
+mode: "wide"
+---
+
+<Frame>
+  <img src="/images/feed-ingestion-pipeline.svg" alt="Feed ingestion pipeline: inventory files flow through Ingest, Normalize & attribute (with domain guard), Store (vehicle store + audit log), and Serve feed stages before Merchant Center fetches the TSV on schedule." />
+</Frame>
+
+## Key
+
+- Every row is attributed to a dealer before it lands. The domain guard fails open and blocks only on an explicit conflict.
+- Resolved rows upsert into the vehicle store. Conflicting or unresolved rows are quarantined in the audit log, never dropped.
+- Feeds are served from a 15-minute cache and rebuilt live on a miss. Merchant Center fetches on its own schedule.
+- Price enrichment runs off a queue and writes scraped prices back to the store.
+- Solid arrows are runtime flow; the dotted arrow is the optional AI fallback.

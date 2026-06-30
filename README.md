@@ -1,55 +1,58 @@
-# Mintlify Starter Kit
+# DealerOS Commerce Platform — Documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
+Engineering reference for the DealerOS Google Commerce stack: feed ingestion, Merchant Center provisioning, Google Ads/GBP integration, and the v2 Commerce Cockpit.
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+Built on [Mintlify](https://mintlify.com). Published at `commerce.dealeros.co/docs`.
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## Local preview
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
-
-## AI-assisted writing
-
-Set up your AI coding tool to work with Mintlify:
+Requires the [Mintlify CLI](https://www.npmjs.com/package/mint):
 
 ```bash
-npx skills add https://mintlify.com/docs
-```
-
-This command installs Mintlify's documentation skill for your configured AI tools like Claude Code, Cursor, Windsurf, and others. The skill includes component reference, writing standards, and workflow guidance.
-
-See the [AI tools guides](/ai-tools) for tool-specific setup.
-
-## Development
-
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
-
-```
 npm i -g mint
 ```
 
-Run the following command at the root of your documentation, where your `docs.json` is located:
+Run from the repo root (where `docs.json` lives):
 
-```
+```bash
 mint dev
 ```
 
-View your local preview at `http://localhost:3000`.
+Preview at `http://localhost:3000`.
 
-## Publishing changes
+## Validate before pushing
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+```bash
+mint validate      # strict — exits non-zero on warnings
+mint broken-links  # checks all internal and external hrefs
+```
 
-## Need help?
+Both must pass clean before merging to `main`.
 
-### Troubleshooting
+## Pages
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
+| File | Description |
+|------|-------------|
+| `index.mdx` | Platform overview |
+| `onboard-a-dealer.mdx` | Step-by-step dealer onboarding |
+| `architecture-overview.mdx` | System architecture |
+| `feed-ingestion-pipeline.mdx` | Inventory feed → GMC pipeline |
+| `data-model-and-schema.mdx` | Core data model and DB schema |
+| `google-integrations.mdx` | Merchant Center, Ads, GBP, GSC wiring |
+| `v2-cockpit-architecture.mdx` | v2 Commerce Cockpit (MUI + Motion) |
+| `onboarding-and-setup-walkthrough.mdx` | Guided-manual setup flow |
+| `source-to-normalization-to-gmc-tsv.mdx` | Feed normalization and TSV spec |
+| `engineering-standards-and-conventions.mdx` | Coding and testing standards |
+| `glossary-and-domain-model.mdx` | Domain glossary |
 
-### Resources
-- [Mintlify documentation](https://mintlify.com/docs)
+## Adding a page
+
+1. Create `your-page.mdx` with a `title` and `description` frontmatter block.
+2. Add the slug to the appropriate group in `docs.json` under `navigation.tabs[0].groups`.
+3. Run `mint validate` and `mint broken-links` locally.
+4. Open a PR against `main`.
+
+## Resources
+
+- [Mintlify docs](https://mintlify.com/docs)
+- [docs.json reference](https://mintlify.com/docs/settings/global)

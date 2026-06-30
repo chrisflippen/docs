@@ -1,0 +1,30 @@
+---
+title: "Google integrations"
+description: "How the operator app talks to a dealer's Google accounts through one service account, and the guarded path that connects, swaps, or provisions them."
+icon: "cable"
+mode: "wide"
+---
+
+## Topology
+
+Who calls whom, from the operator's screen out to Google and the system's records.
+
+<Frame>
+  <img src="/images/google-integrations-1.svg" alt="Topology: Operator screen calls the backend (Requests, Engines, Resolver, Write-guard) which writes to Google APIs (Merchant Center, Google Ads, GA4/Search Console) and reads/writes Records (dealer links, audit jobs)" />
+</Frame>
+
+## Connect / swap sequence
+
+The guarded path that previews, then links, provisions, or swaps a dealer's account.
+
+<Frame>
+  <img src="/images/google-integrations-2.svg" alt="Connect / swap sequence: Operator opens dialog, engine reads current link and returns a zero-mutation preview, operator confirms, engine audits and soft-disables the existing link, asserts the write-guard, creates or links the account in Google API, links to Records, then returns the result to the Operator" />
+</Frame>
+
+## Key
+
+- One service account authenticates every Google surface. There is no per-dealer sign-in.
+- The account a change touches is determined by the dealer you are working in, never by the incoming request.
+- Every Google write passes a guard that defaults to DENY. Reads, discovery, and feed generation never do.
+- A merchant swap runs as one locked, all-or-nothing unit per dealer. A superseded link is finalized, never rolled back.
+- Business Profile is linked through Merchant Center during provisioning, not as a separate surface.

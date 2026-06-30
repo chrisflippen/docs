@@ -1,0 +1,80 @@
+---
+title: "Engineering Standards & Conventions"
+description: "The rules the codebase enforces automatically — and the reasoning behind each one."
+icon: "ruler"
+---
+
+These conventions exist so that correctness properties live in the code itself, not in whoever reviewed the change.
+
+The application enforces five design laws through automated linting — they are treated as errors, not warnings, and every change is checked automatically before it can merge. A separate automated check enforces one additional rule on parallel data loading. A third section captures testing philosophy — which tests to keep and which become brittle maintenance traps — but that guidance is human judgment, not an automated check.
+
+## Design laws
+
+All five laws are enforced by the linter. A change that violates any law does not merge.
+
+| Law | What it bans | What to use instead |
+|---|---|---|
+| **LAW 2 + 7 — Color** | Hex literals, `rgb()`, `rgba()`, `hsl()` with numeric channels — everywhere outside the theme layer | MUI palette tokens (`theme.palette.error.main`, `'error.main'` in `sx`) or CSS vars (`var(--mui-palette-primary-main)`) |
+| **LAW 4 — Interactive HTML** | Raw `<button>`, `<input>`, `<select>`, `<textarea>`, `<a>` (clickable) | MUI equivalents: `<Button>`, `<TextField>`, `<Select>`, `<Link>` |
+| **LAW 5 — Domain imports** | Crossing a domain boundary via a deep path | Import from the domain barrel — see [Domain-home](#domain-home) |
+| **LAW 6 — Animation** | Importing the animation library directly anywhere except the shared motion module | Always import from the shared motion wrapper |
+
+<Note>
+**Carve-out:** the root error boundary is exempted from the color and interactive laws. It renders before the styling and component providers are available, so it cannot use MUI components or theme tokens by definition.
+</Note>
+
+## Domain-home
+
+Any domain folder that exposes a single public entry point (a barrel) is a **domain**. Code outside that folder must import from the barrel, never reach into a deep path inside it.
+
+```ts
+// Correct — cross-domain import via the barrel
+import { attachExistingAccount } from '@/domains/accounts';
+
+// Wrong — deep path crosses a domain boundary
+import { attachExistingAccount } from '@/domains/accounts/internal/engine';
+```
+
+Files within a domain can import siblings freely — the rule is about crossing out, not moving around inside.
+
+LAW 5 discovers domains automatically. To introduce a new domain, give its folder a barrel (a single public entry point), and the constraint applies automatically.
+
+## `Promise.allSettled` — not `Promise.all`
+
+<Note>
+**Automatically enforced.** A separate automated check scans the application source for `Promise.all(` and blocks the change if it finds one. This check runs alongside the design laws.
+</Note>
+
+Any page that loads from multiple sources must use `Promise.allSettled`. One slow or failing surface must not blank the whole page.
+
+## Testing philosophy
+
+Tests should prove behavior, not implementation. Cheap to maintain, impossible to accidentally make pass. The guidance below is human judgment — it shapes which tests get written, but it is not enforced automatically.
+
+**Keep** tests that:
+- Assert a mutation refuses to fire without explicit permission — and that no network call is made
+- Cover a real safety or audit contract (write safety, accessibility, environment checks)
+- Verify a blocking condition stays blocked across the relevant state space
+
+**Delete** tests that:
+- Snapshot rendered markup (fail on every UI touch)
+- Assert internal call counts or argument shapes that don't cross a public boundary
+- Are brittle to test-environment timing or render order
+
+### Write-safety pattern
+
+Write-safety unit tests assert gating behavior only — they never exercise a real network call:
+
+```ts
+it('blocks and sends NO request when canWrite is false', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+
+  const result = await submitFeedUpdate('123', false, true);
+
+  expect(result.status).toBe('blocked');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+```
+
+A companion browser test confirms that in a simulated production environment, mutation controls are unreachable in the interface and no write requests are issued.

@@ -1,0 +1,72 @@
+---
+title: "Onboard a Dealer & Register a Feed"
+description: "Get a dealer live on Merchant Center in five wizard steps — from zero to a fetching feed."
+icon: "rocket"
+---
+
+**What you'll do**
+
+- Confirm the dealer's identity and store profile
+- Link their Google surfaces (Merchant Center is required to publish)
+- Trigger feed ingestion
+- Register the hosted feed with Merchant Center
+
+## Before you start
+
+Make sure these are in place:
+
+- The dealer record exists. Create it from the new-dealer page if it doesn't.
+- The dealer's inventory is flowing into the system. Ingestion runs automatically once inventory is arriving.
+
+## The five steps
+
+Open the dealer's setup wizard. The wizard is resumable; it always lands you on the earliest step that needs attention.
+
+<Steps>
+  <Step title="Identity">
+    Read-only. Confirm the dealer name and Merchant Center account ID look right. This step is always complete once the dealer record exists.
+  </Step>
+  <Step title="Store profile">
+    Enter the dealer's website, confirm their additional-fees policy, and fill in the full business address (street, city, state, ZIP). Add the Google Business Profile store code here if you have it — you'll need it before publish.
+
+    **Success:** all four required fields saved (website, fees confirmed, street address, city/state/ZIP).
+  </Step>
+  <Step title="Connect">
+    Link Google surfaces. Each card walks you through what to do and gives you a deep-link into the relevant Google console.
+
+    - Merchant Center is required to reach the publish step.
+    - Google Ads, GA4, and Search Console are optional but recommended.
+
+    **Success:** at least one surface linked; Merchant Center linked specifically.
+  </Step>
+  <Step title="Feed">
+    Request an inventory feed from the provider, or confirm inventory is already flowing into the system. The wizard shows a live inventory count.
+
+    **Success:** feed request marked "received" or live inventory count is above zero.
+  </Step>
+  <Step title="Publish">
+    Click **Connect generated feed**. This registers the hosted feed with Merchant Center — idempotent, so it's safe to re-run.
+
+    This step unlocks as soon as Merchant Center is linked. To actually connect the feed you also need the Google Business Profile store code set — without it the Connect button stays disabled and shows a "Store code required" notice pointing back to Step 2.
+
+    **Success:** the feed data source appears in Merchant Center and the wizard shows this step as complete.
+  </Step>
+</Steps>
+
+## After publish
+
+Merchant Center fetches the feed on its own schedule. To confirm it worked sooner:
+
+1. Open Merchant Center → Products → Feeds and trigger a manual fetch.
+2. Verify the data source appears and isn't in a taken-down state.
+3. Confirm Vehicle Ads or Free Listings destinations show as active.
+
+## If something's off
+
+| Symptom | Fix |
+|---|---|
+| Publish step is locked | Link Merchant Center in Step 3 |
+| "Store code required" callout | Go back to Step 2 and add the Google Business Profile store code |
+| Publish button does nothing | Confirm publishing is enabled for your account and you have permission to publish, then retry |
+| Merchant Center can't fetch the feed | Re-run the Publish step (it's idempotent) to re-register the data source, then trigger a manual fetch in Merchant Center |
+| Inventory count stuck at zero | Confirm inventory is flowing into the system; ingestion runs automatically once it arrives. If the count stays at zero, check with the inventory provider |

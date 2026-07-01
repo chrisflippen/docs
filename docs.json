@@ -31,7 +31,22 @@
           "icon": "newspaper"
         }
       ]
-    }
+    },
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "index",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Feeds",
+        "pages": [
+          "feeds/feed-mapping-diagrams"
+        ]
+      }
+    ]
   },
   "logo": {
     "light": "/logo/light.svg",

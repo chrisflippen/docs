@@ -1,0 +1,91 @@
+---
+title: "Feed-mapping diagrams"
+description: "How inventory-feed columns are routed to the database, and the standing rule that keeps the mapping reviewable."
+icon: "diagram-project"
+---
+
+## What these diagrams are
+
+Every inventory feed we ingest is a CSV whose columns get routed by code into one of four destinations. A **feed-mapping diagram** is a generated, self-contained HTML artifact — one per source feed file — that renders that routing as a reviewable table. It is **not hand-drawn**: it's produced by a generator that imports the real ingestion/normalization code and executes it against a sample feed, so the diagram is a faithful snapshot of what the code actually does, not a parallel description of it that could drift out of sync.
+
+<Note>
+  The full diagrams (one per real feed source) live in the engineering repo only, under `docs/feed-mappings/`. They are never published here, because even with faked example values their provenance can identify a dealer. This page shows the rule plus **one fully sanitized example**.
+</Note>
+
+## The four routes
+
+Every column in a feed header lands in exactly one of these:
+
+<CardGroup cols={2}>
+  <Card title="typed" icon="check">
+    Maps to a real, typed column on `vehicles` (e.g. `vehicles.vin`, `vehicles.make`). May or may not actually reach the Merchant TSV — see the TSV badges below.
+  </Card>
+
+  <Card title="identifier" icon="key">
+    Resolves which dealer/account a row belongs to (`dealer_id` / `account_id` / `store_code`), rather than a vehicle attribute.
+  </Card>
+
+  <Card title="source_extras" icon="box-archive">
+    No typed destination exists for this header today. The raw value is kept, losslessly, as a key in a `source_extras` JSONB column — nothing is thrown away, but nothing consumes it either.
+  </Card>
+
+  <Card title="dropped" icon="trash">
+    Denylisted or otherwise discarded outright (for example, latitude/longitude are hard-denylisted from `source_extras` as a privacy carve-out).
+  </Card>
+</CardGroup>
+
+## The matching rules
+
+The routing engine follows a small set of strict rules, and almost every silent data-quality bug traces back to one of them:
+
+1. **Exact normalized-token match only.** Each header is lowercased and stripped of non-alphanumeric characters into a "matcher token." A token that isn't on any candidate list is never fuzzy-matched — it goes straight to `source_extras` (or `dropped` if denylisted).
+2. **First-candidate-wins.** When more than one header in a file could satisfy the same target, the earliest one in file column order claims it. Every later synonym falls through to `source_extras`, even if it holds better data.
+3. **`source_extras` is not a bug — an un-mapped route is.** A column landing in `source_extras` means the raw value survived; it's the silent **mis-route** (a real signal claimed by the wrong header, or one that never gets consumed downstream) that causes production defects.
+
+<Warning>
+  A recurring failure class: a column can be **typed** correctly at ingestion and still never reach the Merchant Ads feed, because the TSV generator chooses not to emit it as its own column (folding it into a free-text description instead). Diagrams badge this explicitly as `typed-not-emitted` so nobody assumes "typed" implies "feed-visible."
+</Warning>
+
+## The standing rule
+
+> Any change that touches inventory-feed ingestion or column mapping requires a regenerated diagram, committed in the same pull request.
+
+The running ingestion code is what actually routes columns in production — this rule doesn't change that. The committed diagram is the **reviewable contract** of that behavior: a deterministic, diffable render of what the code does for a given sample feed. When code and diagram diverge, there are only two valid resolutions — the code regressed (fix it) and re-run the generator, or the mapping intentionally changed (commit the regenerated diagram). A pull request that changes mapping behavior with no diagram diff is exactly the defect this rule exists to catch.
+
+In practice that means: run the generator against the current code and the sample feed, diff the output against the previously committed diagram, and commit whichever file changed as part of the same PR.
+
+## Sanitized example
+
+The table below is a representative excerpt from one generated diagram, with all identifying values replaced by fakes (VINs, stock numbers, dealer/account IDs, URLs) and the source filename/provider swapped for a generic label — the column indices, headers, matcher tokens, routes, targets, and transforms are all real.
+
+| # | Header | Token | Example | Route | Target |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `DealerID` | `dealerid` | `000000` | identifier | `vehicles.dealer_id` (bigint fk) |
+| 1 | `DealershipName` | `dealershipname` | `Example Motors` | source\_extras | `source_extras["DealershipName"]` — lost first-candidate-wins to a later `DealerName` column |
+| 2 | `Stock` | `stock` | `STK00001` | typed | `vehicles.stock_number` (text) |
+| 3 | `VIN` | `vin` | `1HGCM82633A000000` | typed | `vehicles.vin` (text) |
+| 4 | `Type` | `type` | `New` / `Used` | typed | `vehicles.condition` (enum) |
+| 5 | `Year` | `year` | `2024` | typed | `vehicles.year` (smallint) |
+| 6 | `Make` | `make` | `Toyota` | typed | `vehicles.make` (text) |
+| 7 | `Model` | `model` | `Highlander` | typed | `vehicles.model` (text) |
+| 9 | `PhotoCount` | `photocount` | `https://example.com/vdp/1` | source\_extras | `source_extras["PhotoCount"]` — no typed target for this header |
+| 10 | `PhotoUrls` | `photourls` | `https://example.com/vdp/1` | typed | `vehicles.images` (jsonb) |
+| 11 | `VDP` | `vdp` | `https://example.com/vdp/1` | typed | `vehicles.detail_url` (text) |
+| 20 | `Certified` | `certified` | `No` / `Yes` | source\_extras | `source_extras["Certified"]` — see note below |
+
+<Warning>
+  **Row 20, `Certified`:** `vehicles.certified` is hardcoded `false` at insert today. Even though this feed carries real Yes/No certified-status values, there is no code path from a `Certified` header to that column, so the raw value sits inert in `source_extras` and `certified_pre-owned` is always emitted as `false` in the Merchant Ads feed. This is exactly the class of silent gap the diagram makes visible — it would not show up from reading the ingestion code in isolation.
+</Warning>
+
+This source file's full route-count strip was `typed 21 · identifier 6 ·
+source_extras 12 · dropped 0` across 39 columns — every diagram carries that strip so a reviewer can confirm nothing was structurally lost without reading every row.
+
+## Regenerating a diagram
+
+Diagrams are always machine-generated from the live ingestion code — never hand-edited. From `apps/web`:
+
+```bash
+tsx scripts/generate-feed-mapping-diagram.ts <input-csv-path> [--out <path>] [--sanitize]
+```
+
+`--sanitize` produces the kind of fully public-safe output shown above (fake example values, generic provenance labels) and is only ever used to produce this page's example — the real per-feed diagrams stay in the engineering repo under `docs/feed-mappings/`, gitignored source CSVs never committed.

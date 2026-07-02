@@ -33,6 +33,12 @@
             ]
           },
           {
+            "group": "Feeds",
+            "pages": [
+              "feeds/feed-mapping-diagrams"
+            ]
+          },
+          {
             "group": "Reference",
             "pages": [
               "engineering-standards-and-conventions",

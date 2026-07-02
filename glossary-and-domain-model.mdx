@@ -1,0 +1,107 @@
+---
+title: "Glossary and Domain Model"
+description: "Plain definitions for every term in the feeds platform — from dealer records to TSV output."
+icon: "book-open"
+---
+
+## Dealers and accounts
+
+**Dealer** — A single physical location that sells vehicles. Every other record in the system — inventory, feed files, platform accounts, onboarding progress — anchors to a dealer.
+
+**Dealer status** — Each dealer is `active`, `paused`, or `offboarded`. Only active dealers participate in feed ingestion and TSV generation.
+
+**Display name** — A label used for ordering and display. Recomputed after any change that affects a dealer's identity; falls back to the trade name, then the legal name.
+
+**Store code** — A Google Business Profile identifier that must be set before a Merchant Center feed can be published. It also travels into the TSV as a column so Google can match inventory to a verified location.
+
+**Tombstone** — A retired dealer whose name and website domain are recorded in exclusion sets after offboarding. Any inbound feed row that matches a tombstone receives `ignored_retired` status. The auto-create path checks both exclusion sets before creating a new dealer, preventing a closed location from being resurrected under a different name.
+
+**External account** — Any platform account linked to a dealer, kept in a shared registry. One entry can represent a Merchant Center account, a Google Ads customer, a GA4 property, or a Search Console site — all distinguished by platform and account kind.
+
+**MC ID** — The active Merchant Center account number for a dealer. Derived from the external-account registry, not stored directly. Every Merchant Center change resolves the account from this value rather than accepting an account number supplied from outside.
+
+**Account status** — `linked` for a confirmed connection. `discovered` or `pending_review` for accounts found while scanning a platform but not yet assigned. `disabled` for a soft-removed link. `conflict` for a duplicate or contested assignment.
+
+## Feed ingestion
+
+**Feed provider** — The third-party inventory management system that exports raw vehicle data. The provider is inferred from filename patterns when the file is parsed.
+
+**Feed import** — A record of one inbound feed file. Progresses through `received → processing → processed`, branching to `failed` on an unrecoverable error or `skipped_duplicate` when the file's content has already been processed.
+
+**Attribution** — The process of mapping each row in an inbound feed file to a known dealer. The resolver runs a fallback chain; the first confident base match wins and the row does not continue to lower layers. Exception: a consolidated-domain override can supersede an already-computed base match when the row's identifier belongs to a shared provider feed.
+
+**Dealer attribution engine** — The resolver, in priority order: (1) identifier lookup — a recognized provider-specific dealer code; (2) structured identity match — address and name fields present on the row; (3) file-level binding — applied when the file itself is scoped to a single dealer; (4) match cache and AI name resolution — both run inside the name-resolution path when no higher layer matched; (5) auto-create — last resort, creates a minimal dealer when all other layers miss. Consolidated-domain routing sits outside this sequence: it is an authoritative override applied after the base resolution is computed, and only activates when the row's own identifier appears in the consolidated feed index; it can supersede an already-resolved match.
+
+**Attribution status** — `resolved` when a dealer was found and inventory was saved. `pending_review` when no match survived all layers; the row waits for operator action. `ignored_retired` when the row matches an offboarded dealer tombstone. `ignored_invalid` when the VIN is missing or cannot be normalized.
+
+**Consolidated feed** — A feed file that covers multiple locations under a single provider identifier. The vehicle detail page domain on each row acts as the discriminator. The resolver uses a candidate index keyed strictly by the provider identifier, not a global wildcard, to prevent cross-location routing errors.
+
+**Domain-consistency guard** — A check that blocks attribution when the row's vehicle detail page domain conflicts with the candidate dealer's known website domain. Fail-open: when either domain is absent, the row passes.
+
+**Ingestion normalization** — Rules applied before each sync run that canonicalize raw feed data: VIN formatting, column-name aliasing, price parsing, and image URL extraction. The rules are operator-editable and take effect on the next run.
+
+**Match cache** — Previously resolved name-to-dealer mappings. Read on each attribution pass before falling through to AI resolution or the auto-create path.
+
+**Auto-create** — The last-resort attribution layer. When no other layer matches, the engine creates a minimal dealer so inventory lands immediately. Guarded by the tombstone checks. Auto-created dealers are marked as such so they can be told apart from operator-created ones.
+
+## Inventory
+
+**Vehicle** — A single unit of inventory, unique per dealer and VIN. Added and updated in batches during ingestion. When a VIN drops out of the source feed, its vehicle is removed on a later import.
+
+**VIN** — Vehicle Identification Number. Normalized at ingest: minimum length enforced, optional strip pattern applied, forced to uppercase.
+
+**Vehicle condition** — `new`, `used`, or `certified`.
+
+**Availability** — `in_stock`, `in_transit`, or `out_of_stock`. Only `in_stock` vehicles appear in TSV output.
+
+**VDP (Vehicle Detail Page)** — The dealer's own listing page for a specific vehicle. The VDP scraper reads the current price and sometimes real photos directly from this page.
+
+**Image source** — Provenance tag on a vehicle's image array. `feed` means real photos from the inventory file. `vdp` means photos extracted by the scraper. `stock` means an OEM color-matched render injected for a new, in-transit unit with no real photos. Real photos (`feed` or `vdp`) are never overwritten by a `stock` fill.
+
+**Stock photo upgrade** — An optional feature that injects an OEM render for new in-transit vehicles that arrive with no images. Enabled per dealer; reverts automatically when real photos arrive in the next import.
+
+**Feed exclusion** — An operator-controlled per-VIN suppression that removes a specific vehicle from TSV output. Keyed by dealer and VIN, so the exclusion survives prune and re-list cycles.
+
+## Feed output
+
+**TSV feed** — A tab-separated file formatted to the Google Vehicle Ads spec, one file per dealer. Cached and regenerated periodically so it stays current.
+
+**Feed ID** — The key under which a dealer's TSV file is stored and served. Derived from the Merchant Center account ID when one is linked, falling back to an internal key otherwise. Whatever generates the file and whatever serves it always use the same key.
+
+**All-in price** — The listed price plus any per-dealer document or admin fee. Appears as a separate TSV column. Subject to bidirectional scrape override (may go up or down).
+
+**Datafeed** — The older generation of Merchant Center feed registration.
+
+**Data source** — The newer generation of Merchant Center feed registration; it registers the hosted TSV URL. Both kinds are tracked in the external-account registry.
+
+**Publish** — The action of registering the hosted TSV URL as a Merchant Center data source. Hard requirements: an active Merchant Center account is linked and the store code is set. The operation is idempotent.
+
+**Vehicle Ads** — A destination configured on a Merchant Center data source. Enables the dealer's vehicles to appear in Google's vehicle ad placements.
+
+## Pipeline and safety
+
+**Pipeline run** — A top-level execution record that tracks one full cycle from inventory download through TSV generation and Merchant Center sync. Ordered stages are logged under each run.
+
+**Pipeline stage** — An ordered step within a run. Named stages cover: download, normalize, attribution, tsv, merchant, ga4, search_console, google_ads.
+
+**Write guard** — A policy gate on every external change the system could make. It defaults to denying: nothing is written to an outside platform unless that specific kind of change has been explicitly allowed. Merchant Center changes, account provisioning, stock-photo writes, and VDP write-back are each allowed separately. TSV generation is never blocked by the write guard.
+
+**Feed runtime config** — Operator-controlled settings and normalization rules. Loaded at the start of each sync run, so changes take effect on the next run.
+
+## Onboarding wizard
+
+**Setup step** — One of five sequential stages that move an operator from a blank dealer record to a live Merchant Center feed: Identity, Store Profile, Connect, Feed, and Publish. Step statuses are recalculated fresh on every page load, so the wizard always reflects the current state rather than a saved snapshot.
+
+**Setup step status** — `done` when the goal is satisfied. `actionable` when the operator can act right now. `pending_async` when work is blocked on an external party. `skipped` when the operator explicitly opted past it. `blocked` when a hard prerequisite is unmet — only the Publish step can be blocked.
+
+**Deep link** — A URL pointing directly into a specific page in a Google native console. Wizard "teach" cards embed these so operators can act in the right surface without hunting.
+
+**Surface descriptor** — A definition of how the account-connect dialog should behave for one specific Google surface (Merchant Center, Ads, and so on). Supporting a new surface means adding a new descriptor, so the same connect experience extends to it without being rebuilt.
+
+## VDP scraper
+
+**VDP scrape** — A queued job that fetches a vehicle's detail page to extract its current listed price and, when available, real photos. Jobs are content-deduplicated, fairly scheduled per dealer to prevent one backlog from starving others, and retried with exponential backoff up to a maximum attempt count.
+
+**Transport tier** — The escalating capability level for a scrape attempt. Tier 1 is a direct fetch; tier 2 adds a proxy or headless browser; tier 3 is the highest-capability option. A job escalates to a higher tier when lower tiers fail.
+
+**Scraped-price override** — Policy governing how a VDP price update applies to the TSV feed. The base listed price accepts only downward corrections — a scrape result that is higher than the feed price is discarded. The all-in price accepts corrections in both directions.

@@ -1,0 +1,17 @@
+---
+title: "Data model and schema"
+description: "The core tables behind the platform — how dealer identity, inventory, account links, and feed runs connect."
+icon: "database"
+mode: "wide"
+---
+
+<Frame>
+  <img src="/images/data-model-and-schema.svg" alt="Entity-relationship diagram showing dealers as the central hub. Solid arrows (CASCADE) flow from dealers to dealer_external_accounts, vehicles, and dealer_feed_mappings. Dashed arrows (SET NULL) flow from dealers to feed_dealer_aliases and feed_source_rows. dealer_external_accounts cascades to sync_runs and feed_health_snapshots." />
+</Frame>
+
+**Key**
+
+- `dealers` is the hub. Identity and ownership fan out to inventory, account links, and feed mappings.
+- Relationship labels show on-delete behavior. **CASCADE** deletes children with the parent. **SET NULL** keeps the row and nulls the link so audit and attribution history survives.
+- Feed sync and health hang off the linked account (`dealer_external_accounts`), not the dealer directly — health is a property of the account.
+- This is the core spine, about a dozen of the ~27 tables. The queue, provisioning, and auth tables follow the same foreign-key conventions.

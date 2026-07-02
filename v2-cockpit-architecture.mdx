@@ -1,0 +1,17 @@
+---
+title: "Cockpit Architecture"
+description: "The locked shell component tree and the design-law gate every change must pass."
+icon: "layout-dashboard"
+mode: "wide"
+---
+
+<Frame>
+  <img src="/images/v2-cockpit-architecture.svg" alt="Cockpit architecture: the locked shell component tree (operator → shell → backend) and the design-law gate that every change must pass." />
+</Frame>
+
+## Key
+
+- The shell is a locked viewport frame — the rail and top bar never move. Only the content region scrolls, and the setup modal overlays only that region, so the chrome stays live during setup.
+- Each shell singleton (rail, top bar, search, and the rest) has exactly one sanctioned mount site. An audit fails the gate if one appears anywhere else.
+- The design-law gate is the definition of done. Every change runs through it in sequence and must pass before it ships — the audits read the shell tree as their source.
+- The cockpit is the presentation layer. No customer data, queue, or credentials live here.

@@ -1,0 +1,16 @@
+---
+title: "Architecture Overview"
+description: "How third-party inventory becomes compliant Google vehicle-ad feeds, and how the cockpit, backend, and Google services fit together."
+icon: "network"
+mode: "wide"
+---
+
+<Frame>
+  <img src="/images/architecture-overview.svg" alt="Architecture overview: Operator browser → Cockpit (UI and data hooks → Proxy boundary) → Backend (API routes + sign-in → Feed ingestion pipeline / Google integrations → Write-guard default DENY) → External Google services (Merchant Center, Google Ads, GA4 / Search Console / Business Profile) and Infrastructure & data stores (Redis queue → Enrichment worker → Postgres; Inventory files)" />
+</Frame>
+
+**Key**
+
+- The cockpit is where your team works. It holds no database, no queue, and no Google credentials — everything runs on the backend, which you reach over a signed-in session.
+- Inventory flows into the system, the pipeline turns it into a compliant vehicle-ad feed, and an enrichment worker fills in and improves listing details as it goes.
+- Every change that writes to Google passes through a write-guard that defaults to DENY, so nothing is published unless explicitly allowed.

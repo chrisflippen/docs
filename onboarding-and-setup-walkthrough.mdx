@@ -1,0 +1,17 @@
+---
+title: "Guided-manual setup sequence"
+description: "How the setup wizard walks an operator through each Google surface — teach, deep-link, then verify the result."
+icon: "route"
+mode: "wide"
+---
+
+<Frame>
+  <img src="/images/onboarding-and-setup-walkthrough.svg" alt="Guided-manual setup sequence: three phases — every-load state read, guided-manual loop per surface, and gated publish — between Operator, Setup wizard, and Google." />
+</Frame>
+
+**Key**
+
+- The wizard never acts in Google for you. Each step teaches, deep-links into the exact Google panel, then verifies the result.
+- Every page load re-reads the latest saved state and re-derives the five step statuses. It makes no Google calls to render the page.
+- "Check status" or any save re-reads and re-derives. That is the only way a step status changes.
+- Publish is the one gated step. It needs a linked Merchant Center, then registers the data source — safe to repeat even if you click again.
